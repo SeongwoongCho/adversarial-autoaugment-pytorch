@@ -29,6 +29,7 @@ def accuracy(output, target, topk=(1,)):
     for k in topk:
         correct_k = correct[:k].reshape(-1).float().sum(0)
         res.append(correct_k.mul_(1. / batch_size))
+    
     return res
     
 class CrossEntropyLabelSmooth(torch.nn.Module):

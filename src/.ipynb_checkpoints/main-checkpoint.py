@@ -97,7 +97,7 @@ if __name__ == '__main__':
                 pred = model(data)
                 losses = [criterion(pred[i::args.M,...] ,label) for i in range(args.M)]
                 loss = torch.mean(torch.stack(losses))
-                
+            
             if args.amp:
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
@@ -110,7 +110,13 @@ if __name__ == '__main__':
                 _loss = _loss.detach()
                 Lm[i] += _loss / len(train_loader)
             
-            top1, top5 = accuracy(pred, torch.cat([label]*args.M,dim=0), (1, 5))
+            top1 = None
+            top5 = None
+            for i in range(args.M):
+                _top1,_top5 = accuracy(pred[i::args.M,...], label, (1, 5))
+                top1 = top1 + _top1 if top1 is not None else _top1
+                top5 = top5 + _top5 if top5 is not None else _top5
+            
             train_loss += reduced_metric(loss.detach(), num_gpus, args.local_rank !=-1) / len(train_loader)
             train_top1 += reduced_metric(top1.detach(), num_gpus, args.local_rank !=-1) / len(train_loader)
             train_top5 += reduced_metric(top5.detach(), num_gpus, args.local_rank !=-1) / len(train_loader)
