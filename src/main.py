@@ -114,8 +114,8 @@ if __name__ == '__main__':
             top5 = None
             for i in range(args.M):
                 _top1,_top5 = accuracy(pred[i::args.M,...], label, (1, 5))
-                top1 = top1 + _top1 if top1 is not None else _top1
-                top5 = top5 + _top5 if top5 is not None else _top5
+                top1 = top1 + _top1/args.M if top1 is not None else _top1
+                top5 = top5 + _top5/args.M if top5 is not None else _top5
             
             train_loss += reduced_metric(loss.detach(), num_gpus, args.local_rank !=-1) / len(train_loader)
             train_top1 += reduced_metric(top1.detach(), num_gpus, args.local_rank !=-1) / len(train_loader)
