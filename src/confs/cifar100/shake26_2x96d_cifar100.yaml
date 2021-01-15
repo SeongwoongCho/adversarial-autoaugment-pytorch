@@ -1,0 +1,7 @@
+dataset : cifar100 
+model : shakeshake26_2x96d
+epoch : 1200
+batch_size : 128
+lr : 0.1
+weight_decay : 5e-4
+entropy_penalty : 1e-5

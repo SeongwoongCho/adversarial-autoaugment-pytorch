@@ -1,0 +1,10 @@
+dataset : cifar10 
+model : pyramid
+depth: 272
+alpha: 200
+bottleneck: True
+epoch : 600
+batch_size : 128
+lr : 0.1
+weight_decay : 1e-4
+entropy_penalty : 1e-5

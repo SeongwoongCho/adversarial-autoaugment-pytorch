@@ -1,0 +1,4 @@
+*.pth
+src/dataloader/datasets/
+src/output.log
+
