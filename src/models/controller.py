@@ -54,12 +54,13 @@ class Controller(nn.Module):
         policies = []
         entropies = []
         log_probs = []
-
-        inp,hx,cx = self.create_static(batch_size)
-        
+           
+#        inp,hx,cx = self.create_static(batch_size)
         for i in range(self.Q):
+            inp,hx,cx = self.create_static(batch_size)
             for j in range(2):
-                if i > 0 or j > 0:
+#                if i > 0 or j > 0:
+                if j > 0:
                     inp = self.embedding(inp) # B,embedding_dim
                 hx, cx = self.lstm(inp, (hx, cx))
                 op = self.outop(hx) # B,NUM_OPS

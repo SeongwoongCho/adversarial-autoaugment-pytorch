@@ -6,6 +6,8 @@ import torch.nn as nn
 import pickle
 import torch.distributed as dist
 import copy
+import yaml
+import re
 from collections import defaultdict
 
 def seed_everything(seed=1234):
@@ -88,7 +90,9 @@ class Logger:
         save_path = os.path.join(self.log,'models/')
         torch.save(model.module.state_dict(), os.path.join(save_path,'checkpoint_%d.pth'%epoch))
         if self.metrics['valid_loss'][-1] == np.min(self.metrics['valid_loss']):
-            torch.save(model.module.state_dict(), os.path.join(save_path,'best.pth'))
+            torch.save(model.module.state_dict(), os.path.join(save_path,'best_loss.pth'))
+        if self.metrics['valid_top1'][-1] == np.max(self.metrics['valid_top1']):
+            torch.save(model.module.state_dict(), os.path.join(save_path,'best_top1.pth'))
     
     def save_logs(self):
         save_path = os.path.join(self.log,'logs.pkl')        
@@ -113,3 +117,19 @@ def reduced_metric(metric,num_gpus,ddp=True):
         reduced_loss = reduce_tensor(metric.data, num_gpus)
         return reduced_loss.item()
     return loss.item()
+
+def load_yaml(dir):
+    loader = yaml.SafeLoader
+    loader.add_implicit_resolver(
+        u'tag:yaml.org,2002:float',
+        re.compile(u'''^(?:
+         [-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+]?[0-9]+)?
+        |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
+        |\\.[0-9_]+(?:[eE][-+][0-9]+)?
+        |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*
+        |[-+]?\\.(?:inf|Inf|INF)
+        |\\.(?:nan|NaN|NAN))$''', re.X),
+        list(u'-+0123456789.'))
+
+    conf = yaml.load(open(dir, 'r'), Loader=loader)
+    return conf

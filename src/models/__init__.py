@@ -26,7 +26,7 @@ def get_controller(conf, local_rank=-1):
     cudnn.benchmark = True
     return model
 
-def get_model(conf, local_rank=-1):
+def get_model(conf, local_rank=-1, state_dict = None):
     name = conf['model']
     num_classes = num_class(conf['dataset'])
     
@@ -55,10 +55,14 @@ def get_model(conf, local_rank=-1):
 
     if local_rank >= 0:
         device = torch.device('cuda', local_rank)
+        if state_dict is not None:
+            model.load_state_dict(state_dict)
         model = model.cuda()
         model = DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters = True)
     else:
         model = model.cuda()
+        if state_dict is not None:
+            model.load_state_dict(state_dict)
         model = DataParallel(model)
     cudnn.benchmark = True
     

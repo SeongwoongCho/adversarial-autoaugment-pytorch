@@ -1,4 +1,9 @@
 *.pth
+*.pkl
 src/dataloader/datasets/
 src/output.log
+
+src/__pycache__/
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
 

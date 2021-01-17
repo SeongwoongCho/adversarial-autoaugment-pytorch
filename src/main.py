@@ -1,17 +1,17 @@
 import argparse
 import numpy as np
-import yaml
 import torch
-import re
+
 import sys
-from utils import *
+from tqdm import tqdm
 from dataloader.dataloader import get_dataloader
 from dataloader.transform import parse_policies, MultiAugmentation
-from models import *
 from optimizer_scheduler import get_optimizer_scheduler
-from tqdm import tqdm
+from models import *
+from utils import *
 
 seed_everything(0)
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Unofficial Implementation of Adversarial Autoaugment')
     parser.add_argument('--load_conf', type = str)
@@ -26,22 +26,6 @@ def init_ddp(local_rank):
     if local_rank !=-1:
         torch.cuda.set_device(local_rank)
         torch.distributed.init_process_group(backend='nccl',init_method='env://')
-
-def load_yaml(dir):
-    loader = yaml.SafeLoader
-    loader.add_implicit_resolver(
-        u'tag:yaml.org,2002:float',
-        re.compile(u'''^(?:
-         [-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+]?[0-9]+)?
-        |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
-        |\\.[0-9_]+(?:[eE][-+][0-9]+)?
-        |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*
-        |[-+]?\\.(?:inf|Inf|INF)
-        |\\.(?:nan|NaN|NAN))$''', re.X),
-        list(u'-+0123456789.'))
-
-    conf = yaml.load(open(dir, 'r'), Loader=loader)
-    return conf
         
 if __name__ == '__main__':
     args = parse_args()
@@ -57,7 +41,7 @@ if __name__ == '__main__':
     print("EXPERIMENT:",args.load_conf.split('/')[-1].split('.')[0])
     print()
     
-    train_sampler, train_loader, valid_loader, test_loader = get_dataloader(conf, dataroot = './dataloader/datasets', split = 0.15, split_idx = 0, multinode = (args.local_rank!=-1))
+    train_sampler, train_loader, valid_loader, test_loader = get_dataloader(conf, dataroot = './dataloader/datasets', split = 0.1, split_idx = 0, multinode = (args.local_rank!=-1))
     
     controller = get_controller(conf,args.local_rank)
     model = get_model(conf,args.local_rank)
@@ -76,13 +60,13 @@ if __name__ == '__main__':
         Lm = torch.zeros(args.M).cuda()
         Lm.requires_grad = False
         
+        model.train()
+        controller.eval()
         policies, log_probs, entropies = controller(args.M) # (M,2*2*5) (M,) (M,) 
         policies = policies.cpu().detach().numpy()
         parsed_policies = parse_policies(policies)        
         trfs_list = train_loader.dataset.dataset.transform.transforms 
         trfs_list[2] = MultiAugmentation(parsed_policies)## replace augmentation into new one
-        
-        controller_optimizer.zero_grad()
         
         train_loss = 0
         train_top1 = 0
@@ -114,8 +98,8 @@ if __name__ == '__main__':
             top5 = None
             for i in range(args.M):
                 _top1,_top5 = accuracy(pred[i::args.M,...], label, (1, 5))
-                top1 = top1 + _top1/args.M if top1 is not None else _top1
-                top5 = top5 + _top5/args.M if top5 is not None else _top5
+                top1 = top1 + _top1/args.M if top1 is not None else _top1/args.M
+                top5 = top5 + _top5/args.M if top5 is not None else _top5/args.M
             
             train_loss += reduced_metric(loss.detach(), num_gpus, args.local_rank !=-1) / len(train_loader)
             train_top1 += reduced_metric(top1.detach(), num_gpus, args.local_rank !=-1) / len(train_loader)
@@ -123,9 +107,14 @@ if __name__ == '__main__':
             
             progress_bar.set_description('Step: {}. LR : {:.5f}. Epoch: {}/{}. Iteration: {}/{}. Train_Loss : {:.5f}'.format(step, optimizer.param_groups[0]['lr'], epoch, conf['epoch'], idx + 1, len(train_loader), loss.item()))
             step += 1
-            
+
+        model.eval()
+        controller.train()
+        controller_optimizer.zero_grad()
+        
         normalized_Lm = (Lm - torch.mean(Lm))/(torch.std(Lm) + 1e-6)
-        controller_loss = -log_probs * normalized_Lm - conf['entropy_penalty'] * entropies
+        controller_loss = -log_probs * normalized_Lm # - derivative of Score function
+        controller_loss -= conf['entropy_penalty'] * entropies # Entropy penalty
         controller_loss = torch.mean(controller_loss)
         controller_loss.backward()
         controller_optimizer.step()
@@ -134,19 +123,26 @@ if __name__ == '__main__':
         valid_loss = 0.
         valid_top1 = 0.
         valid_top5 = 0.
+        cnt = 0.
         with torch.no_grad():
             for idx, (data,label) in enumerate(tqdm(valid_loader)):
+                b = data.size(0)
                 data = data.cuda()
                 label = label.cuda()
                 
                 pred = model(data)
                 loss = criterion(pred,label)
 
-                top1, top5 = accuracy(pred, label, (1, 5))                
-                valid_loss += reduced_metric(loss.detach(), num_gpus, args.local_rank !=-1) / len(valid_loader)
-                valid_top1 += reduced_metric(top1.detach(), num_gpus, args.local_rank !=-1) / len(valid_loader)
-                valid_top5 += reduced_metric(top5.detach(), num_gpus, args.local_rank !=-1) / len(valid_loader)
-        
+                top1, top5 = accuracy(pred, label, (1, 5))
+                valid_loss += reduced_metric(loss.detach(), num_gpus, args.local_rank !=-1) *b 
+                valid_top1 += reduced_metric(top1.detach(), num_gpus, args.local_rank !=-1) *b
+                valid_top5 += reduced_metric(top5.detach(), num_gpus, args.local_rank !=-1) *b 
+                cnt += b
+            
+            valid_loss = valid_loss / cnt
+            valid_top1 = valid_top1 / cnt
+            valid_top5 = valid_top5 / cnt
+            
         logger.add_dict(
             {
                 'train_loss' : train_loss,
@@ -163,4 +159,4 @@ if __name__ == '__main__':
             logger.save_model(model,epoch)
         logger.info(epoch,['train_loss','train_top1','train_top5','valid_loss','valid_top1','valid_top5','controller_loss'])
     
-    logger.save_logs()
+        logger.save_logs()

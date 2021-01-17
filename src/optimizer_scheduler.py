@@ -8,7 +8,7 @@ def get_optimizer_scheduler(controller, model, conf):
     controller_optimizer = Adam(controller.parameters(), lr = 0.00035)
     
     ## define optimizer
-    optimizer = SGD(model.parameters(), lr = conf['lr'], weight_decay = conf['weight_decay'])
+    optimizer = SGD(model.parameters(), lr = conf['lr'], momentum = 0.9, nesterov = True, weight_decay = conf['weight_decay'])
     
     ## define scheduler
     if conf['model'] == 'wresnet28_10':

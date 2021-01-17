@@ -21,8 +21,9 @@ def get_basetransform(dataset):
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
-            transforms.Lambda(lambda x: x), ## Locate new policy
-            transforms.Lambda(lambda imgs: torch.stack([CutoutDefault(cutout)(normalize(transforms.ToTensor()(img))) for img in imgs]))
+            transforms.Lambda(lambda x: [x]), ## Locate new policy
+            transforms.Lambda(lambda imgs: torch.stack(
+                [CutoutDefault(cutout)(normalize(transforms.ToTensor()(img))) for img in imgs]))
         ])
         
         transform_test = transforms.Compose([
@@ -85,7 +86,7 @@ def parse_policies(policies):
     for i in range(M):
         parsed_policy = []
         for j in range(S):
-            parsed_policy.append([(al[(policies[i][4*j])][0].__name__,policies[i][4*j+1]/NUM_MAGS),(al[policies[i][4*j+2]][0].__name__,policies[i][4*j+3]/(NUM_MAGS-1))])
+            parsed_policy.append([(al[(policies[i][4*j])][0].__name__,policies[i][4*j+1]/(NUM_MAGS-1)),(al[policies[i][4*j+2]][0].__name__,policies[i][4*j+3]/(NUM_MAGS-1))])
         parsed_policies.append(parsed_policy)
     
     return parsed_policies
