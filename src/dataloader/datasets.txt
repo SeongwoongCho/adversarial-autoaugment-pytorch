@@ -1,0 +1,5 @@
+cifar-10-C : https://zenodo.org/record/2535967/files/CIFAR-10-C.tar?download=1
+cifar-10-P : https://zenodo.org/record/2535967/files/CIFAR-10-P.tar?download=1
+
+cifar-100-C : https://zenodo.org/record/3555552/files/CIFAR-100-C.tar?download=1
+

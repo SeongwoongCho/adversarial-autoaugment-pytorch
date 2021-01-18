@@ -177,11 +177,16 @@ def SamplePairing(imgs):  # [0, 0.4]
 
 def augment_list(for_autoaug=False):  # 16 operations and their ranges
     l = [
-        (ShearX, -0.3, 0.3),  # 0
-        (ShearY, -0.3, 0.3),  # 1
-        (TranslateX, -0.45, 0.45),  # 2
-        (TranslateY, -0.45, 0.45),  # 3
-        (Rotate, -30, 30),  # 4
+        (ShearX, 0, 0.3),  # 0
+        (ShearY, 0, 0.3),  # 1
+        (TranslateX, 0, 0.45),  # 2
+        (TranslateY, 0, 0.45),  # 3
+        (Rotate, 0, 30),  # 4
+        #(ShearX, -0.3, 0.3),  # 0
+        #(ShearY, -0.3, 0.3),  # 1
+        #(TranslateX, -0.45, 0.45),  # 2
+        #(TranslateY, -0.45, 0.45),  # 3        
+        #(Rotate, -30, 30),  # 4
         (AutoContrast, 0, 1),  # 5
         (Invert, 0, 1),  # 6
         (Equalize, 0, 1),  # 7

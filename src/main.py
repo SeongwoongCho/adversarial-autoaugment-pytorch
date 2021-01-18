@@ -10,13 +10,12 @@ from optimizer_scheduler import get_optimizer_scheduler
 from models import *
 from utils import *
 
-seed_everything(0)
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Unofficial Implementation of Adversarial Autoaugment')
     parser.add_argument('--load_conf', type = str)
     parser.add_argument('--logdir', type = str)
     parser.add_argument('--M', type = int)
+    parser.add_argument('--seed', type = int, default = 0)
     parser.add_argument('--local_rank', type = int, default = -1)
     parser.add_argument('--amp', action='store_true')
     args = parser.parse_args()
@@ -29,19 +28,20 @@ def init_ddp(local_rank):
         
 if __name__ == '__main__':
     args = parse_args()
+    seed_everything(args.seed)
     
     conf = load_yaml(args.load_conf)
-    logger = Logger(os.path.join(args.logdir,args.load_conf.split('/')[-1].split('.')[0]))
+    logger = Logger(os.path.join(args.logdir,args.load_conf.split('/')[-1].split('.')[0] + "_%d"%args.seed))
     num_gpus = torch.cuda.device_count()    
     
     ## DDP set print_option + initialization
     if args.local_rank > 0:
-        sys.stdout = open(os.devnull, 'w')    
+        sys.stdout = open(os.devnull, 'w')
     init_ddp(args.local_rank)
     print("EXPERIMENT:",args.load_conf.split('/')[-1].split('.')[0])
     print()
     
-    train_sampler, train_loader, valid_loader, test_loader = get_dataloader(conf, dataroot = './dataloader/datasets', split = 0.1, split_idx = 0, multinode = (args.local_rank!=-1))
+    train_sampler, train_loader, valid_loader, test_loader = get_dataloader(conf, dataroot = './dataloader/datasets', split = 0, split_idx = 0, multinode = (args.local_rank!=-1))    
     
     controller = get_controller(conf,args.local_rank)
     model = get_model(conf,args.local_rank)
@@ -114,7 +114,8 @@ if __name__ == '__main__':
         
         normalized_Lm = (Lm - torch.mean(Lm))/(torch.std(Lm) + 1e-6)
         controller_loss = -log_probs * normalized_Lm # - derivative of Score function
-        controller_loss -= conf['entropy_penalty'] * entropies # Entropy penalty
+#        controller_loss = -log_probs * Lm # - derivative of Score function
+        controller_loss += -conf['entropy_penalty'] * entropies # Entropy penalty
         controller_loss = torch.mean(controller_loss)
         controller_loss.backward()
         controller_optimizer.step()
@@ -125,7 +126,7 @@ if __name__ == '__main__':
         valid_top5 = 0.
         cnt = 0.
         with torch.no_grad():
-            for idx, (data,label) in enumerate(tqdm(valid_loader)):
+            for idx, (data,label) in enumerate(tqdm(test_loader)):
                 b = data.size(0)
                 data = data.cuda()
                 label = label.cuda()

@@ -41,13 +41,17 @@ def get_dataloader(conf, dataroot = './dataloader/datasets', split = 0.15, split
     else:
         raise Exception()
     
-    sss = StratifiedShuffleSplit(n_splits=5, test_size=split, random_state=0)
-    sss = sss.split(list(range(len(trainset))), trainset.labels if conf['dataset'] == 'svhn' else trainset.targets)
-    for _ in range(split_idx + 1):
-        train_idx, valid_idx = next(sss)
+    if split > 0:
+        sss = StratifiedShuffleSplit(n_splits=5, test_size=split, random_state=0)
+        sss = sss.split(list(range(len(trainset))), trainset.labels if conf['dataset'] == 'svhn' else trainset.targets)
+        for _ in range(split_idx + 1):
+            train_idx, valid_idx = next(sss)
 
-    trainset = Subset(trainset,train_idx)
-    validset = Subset(validset,valid_idx)
+        trainset = Subset(trainset,train_idx)
+        validset = Subset(validset,valid_idx)
+    else:
+        trainset = Subset(trainset, list(range(len(trainset.labels if conf['dataset'] == 'svhn' else trainset.targets))))
+        validset = Subset(validset,[])
     train_sampler = None
     valid_sampler = None
     test_sampler = None
