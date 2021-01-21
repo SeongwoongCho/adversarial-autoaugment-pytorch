@@ -1,11 +1,56 @@
 import torch
 import argparse
+import wget 
 
 from dataloader.dataloader import get_dataloader
 from models import *
 from utils import *
 from tqdm import tqdm
 
+archive = {
+    'cifar10-C' : 'https://zenodo.org/record/2535967/files/CIFAR-10-C.tar?download=1',
+    'cifar10-P' : 'https://zenodo.org/record/2535967/files/CIFAR-10-P.tar?download=1',
+    'cifar100-C' : 'https://zenodo.org/record/3555552/files/CIFAR-100-C.tar?download=1',
+}
+
+def download_corruption_dataset(dataset, root = './dataloader/datasets/'):
+    if 'cifar10' in dataset:
+        if not os.path.exists(os.path.join(root,'CIFAR-10-C')):
+            wget.download(archive['cifar10-C'],out=root)
+            extract_tar(os.path.join(root,'CIFAR-10-C.tar'))
+        if not os.path.exists(os.path.join(root,'CIFAR-10-P')):
+            wget.download(archive['cifar10-P'],out=root)
+            extract_tar(os.path.join(root,'CIFAR-10-P.tar'))
+    if 'cifar100' in dataset:
+        if not os.path.exists(os.path.join(root,'CIFAR-100-C')):
+            wget.download(archive['cifar100-C'],out=root)
+            extract_tar(os.path.join(root,'CIFAR-100-C.tar'))
+    if 'imagenet' in dataset:
+        pass
+    
+def bar_custom(current, total, width=80):
+    width=30
+    avail_dots = width-2
+    shaded_dots = int(math.floor(float(current) / total * avail_dots))
+    percent_bar = '[' + '■'*shaded_dots + ' '*(avail_dots-shaded_dots) + ']'
+    progress = "%d%% %s [%d / %d]" % (current / total * 100, percent_bar, current, total)
+    return progress
+    
+def extract_tar(src, dest=None, gzip=None, delete=False):
+    import tarfile
+
+    if dest is None:
+        dest = os.path.dirname(src)
+    if gzip is None:
+        gzip = src.lower().endswith('.gz')
+
+    mode = 'r:gz' if gzip else 'r'
+    with tarfile.open(src, mode) as tarfh:
+        tarfh.extractall(path=dest)
+
+    if delete:
+        os.remove(src)
+    
 def parse_args():
     parser = argparse.ArgumentParser(description='EVALUATION')
     parser.add_argument('--load_conf', type = str)
@@ -62,8 +107,6 @@ if __name__ == '__main__':
     
 #    ckpt = os.path.join(os.path.join(args.logdir,args.load_conf.split('/')[-1].split('.')[0]),'models/best_loss.pth')
     ckpt = os.path.join(os.path.join(args.logdir,args.load_conf.split('/')[-1].split('.')[0]) + "_%d"%args.seed,'models/best_top1.pth')
-#    ckpt = os.path.join(os.path.join(args.logdir,args.load_conf.split('/')[-1].split('.')[0]),'models/checkpoint_134.pth')
-#    ckpt = os.path.join(args.logdir,'wresnet28x10_cifar10_split0.05_controller_ver1/models/checkpoint_176.pth')
     state_dict = torch.load(ckpt)
     model = get_model(conf,-1, state_dict)
     model.eval()
@@ -77,6 +120,8 @@ if __name__ == '__main__':
     """
     Test Corruption Dataset
     """
+        
+    download_corruption_dataset(conf['dataset'], root = './dataloader/datasets/')
     
     if conf['dataset'] == 'cifar10':
         print("CIFAR10-C TESTSET RESULT")

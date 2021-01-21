@@ -114,7 +114,6 @@ if __name__ == '__main__':
         
         normalized_Lm = (Lm - torch.mean(Lm))/(torch.std(Lm) + 1e-6)
         controller_loss = -log_probs * normalized_Lm # - derivative of Score function
-#        controller_loss = -log_probs * Lm # - derivative of Score function
         controller_loss += -conf['entropy_penalty'] * entropies # Entropy penalty
         controller_loss = torch.mean(controller_loss)
         controller_loss.backward()
