@@ -1,6 +1,15 @@
 # Adversarial-Autoaugment-Pytorch
 Unofficial Pytorch Implementation Of [AdversarialAutoAugment(ICLR2020)](https://arxiv.org/pdf/1912.11188.pdf)
 
+## Current Issue
+I want some help from those who know how to solve these issues. 
+
+- Can not reproduce paper's results
+
+- Adversarial Collapsing : See /Examples/Analysis.ipynb
+
+
+
 ## Quick Start
 ```
 # Training with DistributedDataParallel
@@ -65,7 +74,7 @@ $ python evaluate.py \
 
 ## Different From The Paper
 - I did not include SamplePairing -> NUM_OPS = 15 (16 in the paper)
-- Model optimizer : fast-autoaugment를 참고
+- Borrow unknown hyperparameter settings from fast-autoaugment
 
 ## TODO
 
@@ -74,13 +83,6 @@ CIFAR-10-C auto-download
 CIFAR-10-C, CIFAR-10-P 테스트 코드 추가하기 
 
 ## Observations
-- Optimizer를 뭘로 해야하는가?
-- controller가 얼마나 민감한가? Controller vs Network 간의 조절이 중요할듯 
-
-- controller ver 1(hidden state계속 subpolicy마다 forward할 때) -> 후반부로 갈수록 엄청 강한 augmentation이 나온다. (translateY,0)같은 것들
-=> 따라서 후반부로 갈수록 training loss가 엄청 높아지고, 논문 결과가 재현되지는 않는다. But 그래도 AA보다는 좋은 성능을 보인다. 
-=> 이는 testloader를 validloader로 활용하지 않을 때 결과이고, 만약 testloader로 validating을 한다면 논문에 더 근접한 성능을 보여주지 않을까?
-=> collapse of adversarial training? (learning rate, entropy penalty)
 
 ## References & Open Sources
 [ENAS](https://github.com/carpedm20/ENAS-pytorch)
