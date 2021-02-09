@@ -11,7 +11,7 @@ from .imagenet import ImageNet
 from .transform import get_basetransform, train_collate_fn, test_collate_fn
 
 def get_dataloader(conf, dataroot = './dataloader/datasets', split = 0.15, split_idx = 0, multinode = False):
-    batch_size = conf['batch_size']
+    batch_size = conf['batch_size'] // dist.get_world_size()
     transform_train, transform_test, transform_target = get_basetransform(conf['dataset'])
     
     if conf['dataset'] == 'cifar10':

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import numpy as np
+from torch.autograd import Variable
 
 NUM_OPS = 15 #16
 NUM_MAGS = 10
@@ -27,13 +29,19 @@ class Controller(nn.Module):
         self.outop.bias.data.fill_(0)
         self.outmag.bias.data.fill_(0)
         
+    def get_variable(self, inputs, cuda=False, **kwargs):
+        if type(inputs) in [list, np.ndarray]:
+            inputs = torch.Tensor(inputs)
+        if cuda:
+            out = Variable(inputs.cuda(), **kwargs)
+        else:
+            out = Variable(inputs, **kwargs)
+        return out
+    
     def create_static(self,batch_size):
-        inp = torch.zeros(batch_size,self.embedding_dim,dtype=torch.float32).cuda()
-        hx = torch.zeros(batch_size, self.hidden_dim).cuda()
-        cx = torch.zeros(batch_size, self.hidden_dim).cuda()
-        inp.requires_grad = False
-        hx.requires_grad = False
-        cx.requires_grad = False
+        inp = self.get_variable(torch.zeros(batch_size, self.embedding_dim), cuda = True, requires_grad = False)
+        hx = self.get_variable(torch.zeros(batch_size, self.hidden_dim), cuda = True, requires_grad = False)
+        cx = self.get_variable(torch.zeros(batch_size, self.hidden_dim), cuda = True, requires_grad = False)
         
         return inp,hx,cx
     
@@ -42,10 +50,9 @@ class Controller(nn.Module):
         log_prob = F.log_softmax(logits, dim=-1)
         entropy = -(log_prob * probs).sum(1, keepdim=False)
         action = probs.multinomial(num_samples=1).data
-        action.requires_grad = False
-        selected_log_prob = log_prob.gather(1, action)
+        selected_log_prob = log_prob.gather(1, self.get_variable(action,requires_grad = False))
         
-        return entropy,selected_log_prob[:, 0], action[:,0]
+        return entropy, selected_log_prob[:, 0], action[:,0]
     
     def forward(self,batch_size=1):
         return self.sample(batch_size)
@@ -70,7 +77,7 @@ class Controller(nn.Module):
                 log_probs.append(log_prob)
                 policies.append(action)
                 
-                inp = action
+                inp = self.get_variable(action, requires_grad = False)
                 inp = self.embedding(inp)
                 hx, cx = self.lstm(inp, (hx, cx))
                 mag = self.outmag(hx) # B,NUM_MAGS
@@ -80,7 +87,7 @@ class Controller(nn.Module):
                 log_probs.append(log_prob)
                 policies.append(action)
                 
-                inp = NUM_OPS + action 
+                inp = self.get_variable(NUM_OPS + action, requires_grad = False) 
         
         entropies = torch.stack(entropies, dim = -1) ## B,Q*4
         log_probs = torch.stack(log_probs, dim = -1) ## B,Q*4

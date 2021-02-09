@@ -5,6 +5,7 @@ import torch
 import sys
 from tqdm import tqdm
 from dataloader.dataloader import get_dataloader
+from torch.cuda.amp import GradScaler, autocast
 from dataloader.transform import parse_policies, MultiAugmentation
 from optimizer_scheduler import get_optimizer_scheduler
 from models import *
@@ -49,7 +50,6 @@ if __name__ == '__main__':
     criterion = CrossEntropyLabelSmooth(num_classes = num_class(conf['dataset']))
     
     if args.amp:
-        from torch.cuda.amp import GradScaler, autocast
         scaler = GradScaler()
     
     step = 0
@@ -61,10 +61,11 @@ if __name__ == '__main__':
         Lm.requires_grad = False
         
         model.train()
-        controller.eval()
+        controller.train()
         policies, log_probs, entropies = controller(args.M) # (M,2*2*5) (M,) (M,) 
         policies = policies.cpu().detach().numpy()
-        parsed_policies = parse_policies(policies)        
+        parsed_policies = parse_policies(policies)
+        
         trfs_list = train_loader.dataset.dataset.transform.transforms 
         trfs_list[2] = MultiAugmentation(parsed_policies)## replace augmentation into new one
         
@@ -77,7 +78,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             data = data.cuda()
             label = label.cuda()
-            with autocast():
+            with autocast(enabled=args.amp):
                 pred = model(data)
                 losses = [criterion(pred[i::args.M,...] ,label) for i in range(args.M)]
                 loss = torch.mean(torch.stack(losses))
@@ -91,8 +92,7 @@ if __name__ == '__main__':
                 optimizer.step()
 
             for i,_loss in enumerate(losses):
-                _loss = _loss.detach()
-                Lm[i] += _loss / len(train_loader)
+                Lm[i] += reduced_metric(_loss.detach(), num_gpus, args.local_rank !=-1) / len(train_loader)
             
             top1 = None
             top5 = None
@@ -112,10 +112,11 @@ if __name__ == '__main__':
         controller.train()
         controller_optimizer.zero_grad()
         
-        normalized_Lm = (Lm - torch.mean(Lm))/(torch.std(Lm) + 1e-6)
-        controller_loss = -log_probs * normalized_Lm # - derivative of Score function
-        controller_loss += -conf['entropy_penalty'] * entropies # Entropy penalty
-        controller_loss = torch.mean(controller_loss)
+        normalized_Lm = (Lm - torch.mean(Lm))/(torch.std(Lm) + 1e-5)
+        score_loss = torch.mean(-log_probs * normalized_Lm) # - derivative of Score function
+        entropy_penalty = torch.mean(entropies) # Entropy penalty
+        controller_loss = score_loss - conf['entropy_penalty'] * entropy_penalty
+        
         controller_loss.backward()
         controller_optimizer.step()
         scheduler.step()
@@ -149,6 +150,8 @@ if __name__ == '__main__':
                 'train_top1' : train_top1,
                 'train_top5' : train_top5,
                 'controller_loss' : controller_loss.item(),
+                'score_loss' : score_loss.item(),
+                'entropy_penalty' : entropy_penalty.item(),
                 'valid_loss' : valid_loss,
                 'valid_top1' : valid_top1,
                 'valid_top5' : valid_top5,

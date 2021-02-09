@@ -3,8 +3,6 @@ from torch.nn import functional as F
 from torch.optim import Adam, SGD
 from torch.optim.lr_scheduler import MultiStepLR,CosineAnnealingLR
 
-
-
 def get_optimizer_scheduler(controller, model, conf):
     ## define controller optimizer
     controller_optimizer = Adam(controller.parameters(), lr = 0.00035)
