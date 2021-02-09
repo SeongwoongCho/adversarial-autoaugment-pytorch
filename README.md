@@ -77,14 +77,8 @@ $ python evaluate.py \
 - Borrow unknown hyperparameter settings from fast-autoaugment
 
 ## TODO
-CIFAR-10-C, CIFAR-10-P 테스트 코드 추가하기 
-
-AMP 관련 코드 수정하기
 
 ## Observations
-
-=> entropy weight가 잘못된 것 같음.
-==> Lm을 Normalization하는 과정을 제거하니깐 (잘됨/여전히 안됨)
 
 ## References & Open Sources
 [ENAS](https://github.com/carpedm20/ENAS-pytorch)
